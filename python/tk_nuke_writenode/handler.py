@@ -1054,8 +1054,12 @@ class TankWriteNodeHandler(object):
         # now ensure output name is unique:
         postfix = 1
         output_name = output_default
+        # figure out the prefix by stripping every trailing digit
+        output_prefix = output_name.rstrip('0123456789')
+        # figure out the padding by comparing the length
+        padding = len(output_name) - len(output_prefix)
         while output_name in used_output_names:
-            output_name = "%s%d" % (output_default, postfix)
+            output_name = "%s%s" % (output_prefix, str(postfix).zfill(padding))
             postfix += 1
         
         # finally, set the output name on the knob:
