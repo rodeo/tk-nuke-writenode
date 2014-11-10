@@ -1036,8 +1036,9 @@ class TankWriteNodeHandler(object):
             return
         
         if output_default is None:
-            # no default name - use hard coded built in
-            output_default = "output"
+            # no default name - use the step
+            output_default = self._app.context.as_template_fields(template).get('Step','output')
+            output_default += '001'
         
         # get the output names for all other nodes that are using the same profile
         used_output_names = set()
