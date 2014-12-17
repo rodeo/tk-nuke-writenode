@@ -1006,6 +1006,10 @@ class TankWriteNodeHandler(object):
         # be the case if the user has changed the profile through the UI so this will avoid
         # the node automagically updating without the users knowledge.
         if profile_name != old_profile_name:
+            # force re-populate the initial output name for the current profile:
+            node.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).setValue('')
+            self.__populate_initial_output_name(render_template, node)
+
             self.reset_render_path(node)
 
     def __populate_initial_output_name(self, template, node):
