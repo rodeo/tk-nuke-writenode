@@ -1685,6 +1685,10 @@ class TankWriteNodeHandler(object):
         knob = nuke.thisKnob()
         grp = nuke.thisGroup()
         
+        if knob and knob.name() in ['inputChange']:
+            # Avoid a "ValueError: A PythonObject is not attached to a node" error in __is_node_fully_constructed
+            return
+
         if not self.__is_node_fully_constructed(node):
             # knobChanged will be called during script load for all knobs with non-default 
             # values.  We want to ignore these implicit changes so we make use of a knob to
