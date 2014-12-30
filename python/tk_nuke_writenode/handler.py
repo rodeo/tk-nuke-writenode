@@ -1024,25 +1024,30 @@ class TankWriteNodeHandler(object):
         # first, check that output is actually used in the template and determine 
         # the default value and if the key is optional.
         # (check for the 'channel' key as well for backwards compatibility)
-        have_output_key = False
+        output_key_name = None
         output_default = None
         output_is_optional = True
         for key_name in ["output", "channel"]:
             key = template.keys.get(key_name)
             if key:
-                have_output_key = True
+                output_key_name = key_name
                 if output_default is None:
                     output_default = key.default
                 if output_is_optional:
                     output_is_optional = template.is_optional(key_name)                
-        if not have_output_key:
+        if output_key_name is None:
             # Nothing to do!
             return
         
         if output_default is None:
-            # no default name - use the step
-            output_default = self._app.context.as_template_fields(template).get('Step','output')
-            output_default += '001'
+            # Workaround for optional key (used in "comp_temp" templates):
+            # if default is set for key in templates, computed path always takes default even when output knob is empty
+            if output_key_name == 'channel':
+                output_default = 'pre001'
+            else:
+                # no default name - use the step
+                output_default = self._app.context.as_template_fields(template).get('Step','output')
+                output_default += '001'
         
         # get the output names for all other nodes that are using the same profile
         used_output_names = set()
