@@ -303,6 +303,22 @@ Gizmo {
   inputs 0
   name Input1
   xpos 195
+  ypos -154
+ }
+ Reformat {
+  resize none
+  name SetFormat
+  disable true
+  xpos 195
+  ypos -114
+ }
+ Crop {
+  box {{width} {height} 0 0}
+  reformat true
+  crop false
+  name CropBbox
+  disable true
+  xpos 195
   ypos -74
  }
  Write {

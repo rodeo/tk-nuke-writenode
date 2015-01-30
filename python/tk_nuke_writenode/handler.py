@@ -1116,7 +1116,14 @@ class TankWriteNodeHandler(object):
                 # skip this setting:
                 continue
             
-            knob = write_node.knob(setting_name)
+            # handle settings for gizmo's additional nodes
+            if len(setting_name.split('.')) == 2:
+                try:
+                    knob = node.node(setting_name.split('.')[0]).knob(setting_name.split('.')[1])
+                except:
+                    knob = None
+            else:
+                knob = write_node.knob(setting_name)
             if knob is None:
                 self._app.log_error("%s is not a valid setting for file format %s. It will be ignored." 
                                     % (setting_name, file_type))
