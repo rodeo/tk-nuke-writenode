@@ -1036,8 +1036,9 @@ class TankWriteNodeHandler(object):
             return
         
         if output_default is None:
-            # no default name - use hard coded built in
-            output_default = "output"
+            # no default name - use the step
+            output_default = self._app.context.as_template_fields(template).get('Step','output')
+            output_default += '001'
         
         # get the output names for all other nodes that are using the same profile
         used_output_names = set()
@@ -1054,8 +1055,12 @@ class TankWriteNodeHandler(object):
         # now ensure output name is unique:
         postfix = 1
         output_name = output_default
+        # figure out the prefix by stripping every trailing digit
+        output_prefix = output_name.rstrip('0123456789')
+        # figure out the padding by comparing the length
+        padding = len(output_name) - len(output_prefix)
         while output_name in used_output_names:
-            output_name = "%s%d" % (output_default, postfix)
+            output_name = "%s%s" % (output_prefix, str(postfix).zfill(padding))
             postfix += 1
         
         # finally, set the output name on the knob:
