@@ -1006,6 +1006,10 @@ class TankWriteNodeHandler(object):
         # be the case if the user has changed the profile through the UI so this will avoid
         # the node automagically updating without the users knowledge.
         if profile_name != old_profile_name:
+            # force re-populate the initial output name for the current profile:
+            node.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).setValue('')
+            self.__populate_initial_output_name(render_template, node)
+
             self.reset_render_path(node)
 
     def __populate_initial_output_name(self, template, node):
@@ -1681,6 +1685,10 @@ class TankWriteNodeHandler(object):
         knob = nuke.thisKnob()
         grp = nuke.thisGroup()
         
+        if knob and knob.name() in ['inputChange']:
+            # Avoid a "ValueError: A PythonObject is not attached to a node" error in __is_node_fully_constructed
+            return
+
         if not self.__is_node_fully_constructed(node):
             # knobChanged will be called during script load for all knobs with non-default 
             # values.  We want to ignore these implicit changes so we make use of a knob to
