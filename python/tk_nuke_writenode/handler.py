@@ -1530,6 +1530,9 @@ class TankWriteNodeHandler(object):
         fields["MM"] = today.month
         fields["DD"] = today.day
 
+        # RDO - get the image_type key from the node profile "file_type"
+        fields['image_type'] = node['tk_file_type'].value()
+
         # validate the output name - be backwards compatible with 'channel' as well
         for key_name in ["output", "channel"]:
             if key_name in fields:
