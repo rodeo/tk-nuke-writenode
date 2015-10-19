@@ -336,6 +336,10 @@ class TankWriteNodeHandler(object):
         # is created by the user
         nuke.addOnUserCreate(self.__on_user_create, nodeClass=TankWriteNodeHandler.SG_WRITE_NODE_CLASS)
 
+        # before / after render callbacks
+        nuke.addBeforeRender(self.on_before_render_gizmo_callback, nodeClass='Write')
+        nuke.addAfterRender(self.on_after_render_gizmo_callback, nodeClass='Write')
+
         # set up all existing nodes:
         for n in self.get_nodes():
             self.__setup_new_node(n)
@@ -347,6 +351,8 @@ class TankWriteNodeHandler(object):
         nuke.removeOnScriptLoad(self.process_placeholder_nodes, nodeClass="Root")
         nuke.removeOnScriptSave(self.__on_script_save)
         nuke.removeOnUserCreate(self.__on_user_create, nodeClass=TankWriteNodeHandler.SG_WRITE_NODE_CLASS)
+        nuke.removeBeforeRender(self.on_before_render_gizmo_callback, nodeClass='Write')
+        nuke.removeAfterRender(self.on_after_render_gizmo_callback, nodeClass='Write')
 
     def convert_sg_to_nuke_write_nodes(self):
         """
@@ -696,6 +702,11 @@ class TankWriteNodeHandler(object):
         if not node:
             return
 
+        parent = nuke.thisParent()
+        if not parent.Class() == TankWriteNodeHandler.SG_WRITE_NODE_CLASS:
+            # not inside a WriteTank node
+            return
+
         views = node.knob("views").value().split()
 
         if len(views) < 2:
@@ -733,6 +744,11 @@ class TankWriteNodeHandler(object):
         # the current node is the internal 'Write1' Write node:
         node = nuke.thisNode()
         if not node:
+            return
+
+        parent = nuke.thisParent()
+        if not parent.Class() == TankWriteNodeHandler.SG_WRITE_NODE_CLASS:
+            # not inside a WriteTank node
             return
         
         # remove parent/group from list of currently rendering nodes:
