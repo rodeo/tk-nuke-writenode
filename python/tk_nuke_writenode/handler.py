@@ -48,6 +48,7 @@ class TankWriteNodeHandler(object):
         self._script_template = self._app.get_template("template_script_work")
         
         # cache the profiles:
+        self._promoted_knobs = {}
         self._profile_names = []
         self._profiles = {}
         for profile in self._app.get_setting("write_nodes", []):
@@ -59,7 +60,7 @@ class TankWriteNodeHandler(object):
             
             self._profile_names.append(name)
             self._profiles[name] = profile
-            
+        
         self.__currently_rendering_nodes = set()
         self.__node_computed_path_settings_cache = {}
         self.__path_preview_cache = {}
@@ -351,6 +352,13 @@ class TankWriteNodeHandler(object):
         """
         Utility function to convert all Shotgun Write nodes to regular
         Nuke Write nodes.
+        
+        # Example use:
+        import sgtk
+        eng = sgtk.platform.current_engine()
+        app = eng.apps["tk-nuke-writenode"]
+        # Convert Shotgun write nodes to Nuke write nodes:
+        app.convert_to_write_nodes()
         """
         # clear current selection:
         nukescripts.clear_selection_recursive()
@@ -368,9 +376,12 @@ class TankWriteNodeHandler(object):
             new_wn = nuke.createNode("Write")
             new_wn.setSelected(False)
         
-            # copy across file & proxy knobs:
+            # copy across file & proxy knobs (if we've defined a proxy template):
             new_wn["file"].setValue(sg_wn["cached_path"].evaluate())
-            new_wn["proxy"].setValue(sg_wn["tk_cached_proxy_path"].evaluate())
+            if sg_wn["proxy_render_template"].value():
+                new_wn["proxy"].setValue(sg_wn["tk_cached_proxy_path"].evaluate())
+            else:
+                new_wn["proxy"].setValue("")
 
             # make sure file_type is set properly:
             int_wn = sg_wn.node(TankWriteNodeHandler.WRITE_NODE_NAME)
@@ -442,6 +453,14 @@ class TankWriteNodeHandler(object):
         Utility function to convert all Nuke Write nodes to Shotgun
         Write nodes (only converts Write nodes that were previously
         Shotgun Write nodes)
+
+        # Example use:
+        import sgtk
+        eng = sgtk.platform.current_engine()
+        app = eng.apps["tk-nuke-writenode"]
+        # Convert previously converted Nuke write nodes back to 
+        # Shotgun write nodes:
+        app.convert_from_write_nodes()
         """
         # clear current selection:
         nukescripts.clear_selection_recursive()
@@ -487,14 +506,20 @@ class TankWriteNodeHandler(object):
             new_sg_wn["proxy_publish_template"].setValue(proxy_publish_template_knob.value())
             
             # set the profile & output - this will cause the paths to be reset:
-            new_sg_wn["profile_name"].setValue(profile_knob.value())
+            # Note, we don't call the method __set_profile() as we don't want to
+            # run all the normal logic that runs as part of switching the profile.
+            # Instead we want this node to be rebuilt as close as possible to the
+            # original before it was converted to a regular Nuke write node.
+            profile_name = profile_knob.value()
+            new_sg_wn["profile_name"].setValue(profile_name)
+            new_sg_wn["tk_profile_list"].setValue(profile_name)
             new_sg_wn[TankWriteNodeHandler.OUTPUT_KNOB_NAME].setValue(output_knob.value())
             new_sg_wn[TankWriteNodeHandler.USE_NAME_AS_OUTPUT_KNOB_NAME].setValue(use_name_as_output_knob.value())
 
             # make sure file_type is set properly:
             int_wn = new_sg_wn.node(TankWriteNodeHandler.WRITE_NODE_NAME)
             int_wn["file_type"].setValue(wn["file_type"].value())
-#        
+
             # copy across and knob values from the internal write node.
             for knob_name, knob in wn.knobs().iteritems():
                 # skip knobs we don't want to copy:
@@ -521,9 +546,6 @@ class TankWriteNodeHandler(object):
             new_sg_wn.setName(node_name)
             new_sg_wn.setXpos(node_pos[0])
             new_sg_wn.setYpos(node_pos[1])       
-
-            # run this one last time to ensure the profile list is constructed correctly:
-            self.__setup_new_node(new_sg_wn)
 
 
     ################################################################################################
@@ -957,6 +979,7 @@ class TankWriteNodeHandler(object):
         file_type = profile["file_type"]
         file_settings = profile["settings"]
         tile_color = profile["tile_color"]
+        promote_write_knobs = profile.get("promote_write_knobs", [])
 
         # Make sure any invalid entries are removed from the profile list:
         list_profiles = node.knob("tk_profile_list").values()
@@ -974,6 +997,44 @@ class TankWriteNodeHandler(object):
         # they get serialized with the script:
         self.__update_knob_value(node, "tk_file_type", file_type)
         self.__update_knob_value(node, "tk_file_type_settings", pickle.dumps(file_settings))
+
+        # Hide the promoted knobs that might exist from the previously
+        # active profile.
+        for promoted_knob in self._promoted_knobs.get(node, []):
+            promoted_knob.setFlag(nuke.INVISIBLE)
+        self._promoted_knobs[node] = []
+        write_node = node.node(TankWriteNodeHandler.WRITE_NODE_NAME)
+        # We'll use link knobs to tie our top-level knob to the write node's
+        # knob that we want to promote.
+        for i, knob_name in enumerate(promote_write_knobs):
+            target_knob = write_node.knob(knob_name)
+            if not target_knob:
+                self._app.log_warning("Knob %s does not exist and will not be promoted." % knob_name)
+                continue
+            link_name = "_promoted_" + str(i)
+            # We have 20 link knobs stashed away to use.  If we overflow that
+            # then we will simply create a new link knob and deal with the
+            # fact that it will end up in a "User" tab in the UI. The reason
+            # that we store a gaggle of link knobs on the gizmo is that it's
+            # the only way to present the promoted knobs in the write node's
+            # primary tab.  Adding knobs after the node exists results in them
+            # being shoved into a "User" tab all by themselves, which is lame.
+            if i > 19:
+                link_knob = nuke.Link_Knob(link_name)
+            else:
+                # We have to pull the link knobs from the knobs dict rather than
+                # by name, otherwise we'll get the link target and not the link
+                # itself if this is a link that was previously used.
+                link_knob = node.knobs()[link_name]
+            link_knob.setLink(target_knob.fullyQualifiedName())
+            label = target_knob.label() or knob_name
+            link_knob.setLabel(label)
+            link_knob.clearFlag(nuke.INVISIBLE)
+            self._promoted_knobs[node].append(link_knob)
+        # Adding knobs might have caused us to jump tabs, so we will set
+        # back to the first tab.
+        if len(promote_write_knobs) > 19:
+            node.setTab(0)
 
         # write the template name to the node so that we know it later
         self.__update_knob_value(node, "render_template", render_template.name)
@@ -1207,10 +1268,9 @@ class TankWriteNodeHandler(object):
                 # gather the render settings to use when computing the path:
                 render_template, width, height, output_name = self.__gather_render_settings(node, is_proxy)
                 
-                # experimental settings cache to avoid re-computing the path
-                # if nothing has changed...
-                old_cache_entry, compute_path_error = self.__node_computed_path_settings_cache.get((node, is_proxy), 
-                                                                                                   (None, ""))
+                # experimental settings cache to avoid re-computing the path if nothing has changed...
+                cache_item = self.__node_computed_path_settings_cache.get((node, is_proxy), (None, "", ""))
+                old_cache_entry, compute_path_error, render_path = cache_item
                 cache_entry = {
                     "ctx":self._app.context,
                     "width":width,
@@ -1220,10 +1280,7 @@ class TankWriteNodeHandler(object):
                 }
                 
                 if (not force_reset) and old_cache_entry and cache_entry == old_cache_entry:
-                    # nothing of relevance has changed since the last time the path was
-                    # computed so just use the cached path:
-                    render_path = cached_path
-                    
+                    # nothing of relevance has changed since the last time the path was changed!
                     # if there was previously an error then raise it so that it gets reported properly:
                     if compute_path_error:
                         raise TkComputePathError(compute_path_error)
@@ -1233,7 +1290,7 @@ class TankWriteNodeHandler(object):
                     
             except TkComputePathError, e:
                 # update cache:
-                self.__node_computed_path_settings_cache[(node, is_proxy)] = (cache_entry, str(e))
+                self.__node_computed_path_settings_cache[(node, is_proxy)] = (cache_entry, str(e), "")
                 
                 # render path could not be computed for some reason - display warning
                 # to the user in the property editor:
@@ -1255,7 +1312,7 @@ class TankWriteNodeHandler(object):
                 render_path = cached_path
             else:
                 # update cache:
-                self.__node_computed_path_settings_cache[(node, is_proxy)] = (cache_entry, "")
+                self.__node_computed_path_settings_cache[(node, is_proxy)] = (cache_entry, "", render_path)
                 
                 path_is_locked = False
                 if not force_reset:
@@ -1509,7 +1566,7 @@ class TankWriteNodeHandler(object):
         
         # extract the work fields from the script path using the work_file template:
         fields = {}
-        if self._script_template and self._script_template.validate(curr_filename):
+        if curr_filename and self._script_template and self._script_template.validate(curr_filename):
             fields = self._script_template.get_fields(curr_filename)
         if not fields:
             raise TkComputePathError("The current script is not a Shotgun Work File!")
