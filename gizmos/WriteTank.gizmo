@@ -194,6 +194,11 @@ Gizmo {
     +STARTLINE
  }
  addUserKnob {
+    41 file 
+    T Write1.file
+    +INVISIBLE
+ }
+ addUserKnob {
     41 channels 
     T Write1.channels
  }
