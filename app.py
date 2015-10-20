@@ -213,5 +213,5 @@ class NukeWriteNode(tank.platform.Application):
         Removes write node menu entries for all write node configurations
         """
         node_menu_handle = nuke.menu("Nodes").findItem(self.engine._menu_generator._menu_name)
-        if node_menu_handle:
+        if node_menu_handle and isinstance(node_menu_handle, nuke.Menu):
             node_menu_handle.clearMenu()
