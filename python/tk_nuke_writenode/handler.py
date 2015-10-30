@@ -1002,6 +1002,13 @@ class TankWriteNodeHandler(object):
         # active profile.
         for promoted_knob in self._promoted_knobs.get(node, []):
             promoted_knob.setFlag(nuke.INVISIBLE)
+        # Hide / unhide promoted tab depending if there's any promoted knob
+        tab_knob = node.knob("_promoted")
+        if tab_knob:
+            if promote_write_knobs:
+                tab_knob.clearFlag(nuke.INVISIBLE)
+            else:
+                tab_knob.setFlag(nuke.INVISIBLE)
         self._promoted_knobs[node] = []
         write_node = node.node(TankWriteNodeHandler.WRITE_NODE_NAME)
         # We'll use link knobs to tie our top-level knob to the write node's
@@ -1033,8 +1040,7 @@ class TankWriteNodeHandler(object):
             self._promoted_knobs[node].append(link_knob)
         # Adding knobs might have caused us to jump tabs, so we will set
         # back to the first tab.
-        if len(promote_write_knobs) > 19:
-            node.setTab(0)
+        node.setTab(0)
 
         # write the template name to the node so that we know it later
         self.__update_knob_value(node, "render_template", render_template.name)
