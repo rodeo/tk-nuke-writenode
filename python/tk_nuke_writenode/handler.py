@@ -1014,7 +1014,17 @@ class TankWriteNodeHandler(object):
         # We'll use link knobs to tie our top-level knob to the write node's
         # knob that we want to promote.
         for i, knob_name in enumerate(promote_write_knobs):
-            target_knob = write_node.knob(knob_name)
+            # Allow promoting gizmo's additional nodes
+            tokens = knob_name.split('.')
+            target_node = None
+            if len(tokens) == 2:
+                try:
+                    target_node = node.node(tokens[0])
+                    target_knob = target_node.knob(tokens[1])
+                except AttributeError: # If no extra node corresponds
+                    target_knob = None
+            else:
+                target_knob = write_node.knob(knob_name)
             if not target_knob:
                 self._app.log_warning("Knob %s does not exist and will not be promoted." % knob_name)
                 continue
@@ -1035,6 +1045,8 @@ class TankWriteNodeHandler(object):
                 link_knob = node.knobs()[link_name]
             link_knob.setLink(target_knob.fullyQualifiedName())
             label = target_knob.label() or knob_name
+            if target_node:
+                label = "%s %s" % (target_node.name(), label)
             link_knob.setLabel(label)
             link_knob.clearFlag(nuke.INVISIBLE)
             self._promoted_knobs[node].append(link_knob)
