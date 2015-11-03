@@ -1018,12 +1018,29 @@ class TankWriteNodeHandler(object):
         # active profile.
         for promoted_knob in self._promoted_knobs.get(node, []):
             promoted_knob.setFlag(nuke.INVISIBLE)
+        # Hide / unhide promoted tab depending if there's any promoted knob
+        tab_knob = node.knob("_promoted")
+        if tab_knob:
+            if promote_write_knobs:
+                tab_knob.clearFlag(nuke.INVISIBLE)
+            else:
+                tab_knob.setFlag(nuke.INVISIBLE)
         self._promoted_knobs[node] = []
         write_node = node.node(TankWriteNodeHandler.WRITE_NODE_NAME)
         # We'll use link knobs to tie our top-level knob to the write node's
         # knob that we want to promote.
         for i, knob_name in enumerate(promote_write_knobs):
-            target_knob = write_node.knob(knob_name)
+            # Allow promoting gizmo's additional nodes
+            tokens = knob_name.split('.')
+            target_node = None
+            if len(tokens) == 2:
+                try:
+                    target_node = node.node(tokens[0])
+                    target_knob = target_node.knob(tokens[1])
+                except AttributeError: # If no extra node corresponds
+                    target_knob = None
+            else:
+                target_knob = write_node.knob(knob_name)
             if not target_knob:
                 self._app.log_warning("Knob %s does not exist and will not be promoted." % knob_name)
                 continue
@@ -1044,13 +1061,14 @@ class TankWriteNodeHandler(object):
                 link_knob = node.knobs()[link_name]
             link_knob.setLink(target_knob.fullyQualifiedName())
             label = target_knob.label() or knob_name
+            if target_node:
+                label = "%s %s" % (target_node.name(), label)
             link_knob.setLabel(label)
             link_knob.clearFlag(nuke.INVISIBLE)
             self._promoted_knobs[node].append(link_knob)
         # Adding knobs might have caused us to jump tabs, so we will set
         # back to the first tab.
-        if len(promote_write_knobs) > 19:
-            node.setTab(0)
+        node.setTab(0)
 
         # write the template name to the node so that we know it later
         self.__update_knob_value(node, "render_template", render_template.name)

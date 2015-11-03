@@ -297,9 +297,9 @@ Gizmo {
  }
 
  addUserKnob {
-    26 "" 
-    l "" 
-    +STARTLINE
+    20 _promoted
+    l "Extra Settings"
+    +INVISIBLE
  }
  addUserKnob {
     41 _promoted_0
