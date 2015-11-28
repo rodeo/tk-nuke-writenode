@@ -1151,6 +1151,23 @@ class TankWriteNodeHandler(object):
             if n != node and self.get_node_profile_name(n) == node_profile:
                 used_output_names.add(n.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).value())
 
+        # get extra output names from file system if necessary
+        # ie if template doesn't include the "{version}" key
+        use_version = bool(template.keys.get("version"))
+        if not use_version:
+            fields = {}
+            curr_filename = self.__get_current_script_path()
+            if curr_filename and self._script_template and self._script_template.validate(curr_filename):
+                fields = self._script_template.get_fields(curr_filename)
+
+            paths = self._app.tank.paths_from_template(template,
+                                                       fields,
+                                                       ["output", "channel", "SEQ", "eye", "image_type"])
+            for path in paths:
+                path_fields = template.get_fields(path)
+                if output_key_name in path_fields:
+                    used_output_names.add(path_fields[output_key_name])
+
         # handle if output is optional:
         if output_is_optional and "" not in used_output_names:
             # default should be an empty string:
