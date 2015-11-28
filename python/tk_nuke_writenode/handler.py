@@ -1267,6 +1267,24 @@ class TankWriteNodeHandler(object):
         """
         self._app.log_debug("Changing the output for node '%s' to: %s" % (node.name(), output_name))
         
+        # check if new output_name is not already used
+        name_warning = ""
+        used_output_names = self.__get_used_output_names(node)
+        if output_name in used_output_names:
+            name_warning = "<br>".join(self.__wrap_text(
+                        "This output name is already used ! "
+                        "You might overwrite the output from another of your nodes "
+                        "or from someone else's work.", 60)) + "<br>"
+
+        # update warning displayed to the user:
+        if name_warning:
+            name_warning = "<i style='color:orange'><b><br>Warning</b><br>%s</i><br>" % name_warning
+            self.__update_knob_value(node, "name_warning", name_warning)
+            node.knob("name_warning").setVisible(True)
+        else:
+            self.__update_knob_value(node, "name_warning", "")
+            node.knob("name_warning").setVisible(False)
+
         # update output knob:
         self.__update_knob_value(node, TankWriteNodeHandler.OUTPUT_KNOB_NAME, output_name)
         
