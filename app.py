@@ -47,9 +47,6 @@ class NukeWriteNode(tank.platform.Application):
         
         # remove any callbacks that were registered by the handler:
         self.__write_node_handler.remove_callbacks()
-        
-        # remove WriteNodes from nuke menu
-        self.__remove_write_node_commands()
 
         # clean up the nuke module:
         if hasattr(nuke, "_shotgun_write_node_handler"):
@@ -207,12 +204,3 @@ class NukeWriteNode(tank.platform.Application):
             cb_fn = lambda pn=profile_name: self.__write_node_handler.create_new_node(pn)
             self.engine.register_command("%s [Shotgun]" % profile_name, cb_fn, 
                                          {"type": "node", "icon": write_node_icon})
-
-    def __remove_write_node_commands(self):
-        """
-        Removes write node menu entries for all write node configurations
-        """
-        if nuke.GUI:
-            node_menu_handle = nuke.menu("Nodes").findItem(self.engine._menu_generator._menu_name)
-            if node_menu_handle and isinstance(node_menu_handle, nuke.Menu):
-                node_menu_handle.clearMenu()
