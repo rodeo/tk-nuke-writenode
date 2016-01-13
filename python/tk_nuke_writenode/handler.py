@@ -812,6 +812,45 @@ class TankWriteNodeHandler(object):
         else:
             return self.__get_template(node, "publish_template")
     
+    def __get_used_output_names(self, node):
+        """
+        Get output names already in use for the current profile
+        in the script and (if the version token is not used) on the file system
+        """
+        used_output_names = set()
+
+        # get the output names for all other nodes that are using the same profile
+        node_profile = self.get_node_profile_name(node)
+        for n in self.get_nodes():
+            if n != node and self.get_node_profile_name(n) == node_profile:
+                used_output_names.add(n.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).value())
+
+        # get extra output names from file system if necessary
+        # ie if template doesn't include the "{version}" key
+        template = self.__get_render_template(node)
+        use_version = bool(template.keys.get("version"))
+
+        if not use_version:
+            output_key_name = None
+            for key_name in ["output", "channel"]:
+                if template.keys.get(key_name):
+                    output_key_name = key_name
+
+            fields = {}
+            curr_filename = self.__get_current_script_path()
+            if curr_filename and self._script_template and self._script_template.validate(curr_filename):
+                fields = self._script_template.get_fields(curr_filename)
+
+            paths = self._app.tank.paths_from_template(template,
+                                                       fields,
+                                                       ["output", "channel", "SEQ", "eye", "image_type"])
+            for path in paths:
+                path_fields = template.get_fields(path)
+                if output_key_name in path_fields:
+                    used_output_names.add(path_fields[output_key_name])
+
+        return used_output_names
+
     def __is_output_used(self, node):
         """
         Determine if output key is used in either the render or the proxy render
@@ -1144,29 +1183,8 @@ class TankWriteNodeHandler(object):
                 output_default = self._app.context.as_template_fields(template).get('Step', 'output')
                 output_default += '001'
         
-        # get the output names for all other nodes that are using the same profile
-        used_output_names = set()
-        node_profile = self.get_node_profile_name(node)
-        for n in self.get_nodes():
-            if n != node and self.get_node_profile_name(n) == node_profile:
-                used_output_names.add(n.knob(TankWriteNodeHandler.OUTPUT_KNOB_NAME).value())
-
-        # get extra output names from file system if necessary
-        # ie if template doesn't include the "{version}" key
-        use_version = bool(template.keys.get("version"))
-        if not use_version:
-            fields = {}
-            curr_filename = self.__get_current_script_path()
-            if curr_filename and self._script_template and self._script_template.validate(curr_filename):
-                fields = self._script_template.get_fields(curr_filename)
-
-            paths = self._app.tank.paths_from_template(template,
-                                                       fields,
-                                                       ["output", "channel", "SEQ", "eye", "image_type"])
-            for path in paths:
-                path_fields = template.get_fields(path)
-                if output_key_name in path_fields:
-                    used_output_names.add(path_fields[output_key_name])
+        # get the output names in use
+        used_output_names = self.__get_used_output_names(node)
 
         # handle if output is optional:
         if output_is_optional and "" not in used_output_names:
@@ -1253,6 +1271,24 @@ class TankWriteNodeHandler(object):
         """
         self._app.log_debug("Changing the output for node '%s' to: %s" % (node.name(), output_name))
         
+        # check if new output_name is not already used
+        name_warning = ""
+        used_output_names = self.__get_used_output_names(node)
+        if output_name in used_output_names:
+            name_warning = "<br>".join(self.__wrap_text(
+                "This output name is already used ! "
+                "You might overwrite the output from another of your nodes "
+                "or from someone else's work.", 60)) + "<br>"
+
+        # update warning displayed to the user:
+        if name_warning:
+            name_warning = "<i style='color:orange'><b><br>Warning</b><br>%s</i><br>" % name_warning
+            self.__update_knob_value(node, "name_warning", name_warning)
+            node.knob("name_warning").setVisible(True)
+        else:
+            self.__update_knob_value(node, "name_warning", "")
+            node.knob("name_warning").setVisible(False)
+
         # update output knob:
         self.__update_knob_value(node, TankWriteNodeHandler.OUTPUT_KNOB_NAME, output_name)
         
