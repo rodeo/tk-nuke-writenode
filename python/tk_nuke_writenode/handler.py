@@ -813,6 +813,10 @@ class TankWriteNodeHandler(object):
             return self.__get_template(node, "publish_template")
     
     def __get_used_output_names(self, node):
+        """
+        Get output names already in use for the current profile
+        in the script and (if the version token is not used) on the file system
+        """
         used_output_names = set()
 
         # get the output names for all other nodes that are using the same profile
