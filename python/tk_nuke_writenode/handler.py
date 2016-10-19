@@ -1187,9 +1187,11 @@ class TankWriteNodeHandler(object):
         used_output_names = self.__get_used_output_names(node)
 
         # handle if output is optional:
-        if output_is_optional and "" not in used_output_names:
-            # default should be an empty string:
-            output_default = ""
+        # tentatively commented .. preventing first ShotgunWrite node output knob to get the
+        # correct initial value..
+        #if output_is_optional and used_output_names and "" not in used_output_names:
+        #    # default should be an empty string:
+        #    output_default = ""
 
         # now ensure output name is unique:
         postfix = 1
